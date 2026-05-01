@@ -1,6 +1,6 @@
 # DSCI Drought Analysis — Massachusetts
 
-Weekly Drought Severity and Coverage Index (DSCI) visualization with functional median detection using Modified Band Depth.
+Weekly Drought Severity and Coverage Index (DSCI) visualization with functional median detection using Modified Band Depth (MBD2), moving-average smoothing, and spline-based derivative analysis.
 
 ---
 
@@ -72,7 +72,11 @@ Three variants of band depth exist:
 
 ## Code Walkthrough
 
-### Step 1 — `load_and_compute_dsci()`
+### Core Functions
+
+#### `load_and_compute_dsci(path)`
+
+Parses dates, computes DSCI, and extracts year and ISO week number:
 
 ```python
 df["DSCI"] = df["D0"] + df["D1"] + df["D2"] + df["D3"] + df["D4"]
@@ -80,11 +84,11 @@ df["Year"] = df["MapDate"].dt.year
 df["Week"] = df["MapDate"].dt.isocalendar().week.astype(int)
 ```
 
-Parses dates, computes DSCI, and extracts year and week number. We use `dt.year` (not ISO year) to avoid late-December rows being misattributed to the next year.
+Uses `dt.year` (not ISO year) to avoid late-December rows being misattributed to the next year.
 
 ---
 
-### Step 2 — `build_matrix()`
+#### `build_matrix(df, start_year, end_year, max_weeks=52)`
 
 ```python
 curve = np.interp(
@@ -94,13 +98,13 @@ curve = np.interp(
 )
 ```
 
-Some years have 53 ISO weeks, some have gaps. `np.interp` standardizes every year to exactly 52 evenly-spaced points. The result is a **matrix of shape (n_years × 52)** — one row per year, one column per week.
+Some years have 53 ISO weeks, some have gaps. `np.interp` standardizes every year to exactly 52 evenly-spaced points. Returns a **matrix of shape (n_years × 52)** — one row per year, one column per week.
 
-Years where `max(DSCI) < 1` are skipped — those are corrupt/missing data (2003 and 2011 in the MA dataset are all zeros).
+Years where `max(DSCI) < 1` are skipped (corrupt/missing data).
 
 ---
 
-### Step 3 — `modified_band_depth()`
+#### `modified_band_depth(matrix)`
 
 ```python
 for j in range(m):               # for each of the 52 weeks
@@ -119,38 +123,84 @@ At each time point `j`, for curve `i` with value `g`:
 - `c` = how many are above it
 - `b` = how many are equal to it
 
-The expression `a*c + a*b + b*c + b*(b-1)/2` counts how many **pairs** of curves form a band that contains `g` at this time point. Summing over all 52 weeks and dividing by total possible pairs × weeks gives a score in [0, 1]. The curve with the **highest score** is the median.
+The expression `a*c + a*b + b*c + b*(b-1)/2` counts how many **pairs** of curves form a band containing `g`. Summing over all 52 weeks and normalizing by `m * (n*(n-1)/2)` gives a score in [0, 1]. Highest score = functional median.
 
 ---
 
-### Step 4 — `plot_dsci(start_year, end_year)`
+#### `apply_moving_average(matrix, window)`
 
-The single entry point that chains everything together:
+Smooths each year's curve with a centered rolling mean of the given window size. Handles edge effects with `np.convolve`.
 
-1. Loads and filters data to the requested year range
-2. Builds the n_years × 52 matrix
-3. Computes MBD2 depths for all curves
-4. Plots all curves in a blue gradient (older = lighter, newer = darker) with the deepest curve in red
-5. Prints a ranking of most-typical and most-anomalous years
+---
+
+#### `visualize_curves(matrix, years, depths, title, spline_curve, save_png, fname)`
+
+Plots all curves color-coded by depth rank:
+
+| Curve | Color | Style |
+|-------|-------|-------|
+| Median (deepest) | crimson | solid, lw=2.5 |
+| 2nd deepest | royalblue | solid, lw=2.0 |
+| 3rd deepest | forestgreen | solid, lw=2.0 |
+| 3 outliers (shallowest) | mediumpurple | dashed, lw=1.5 |
+| All others | steelblue | lw=0.8, alpha=0.45 |
+| Spline overlay (optional) | black | dash-dot, lw=3.0 |
+
+---
+
+#### `print_depth_summary(depths, years)`
+
+Prints a ranked table of years from most typical (highest depth) to most anomalous (lowest depth).
+
+---
+
+### Analysis Steps
+
+#### Step 1a — Raw MBD2
+
+Computes MBD2 directly on the raw (unsmoothed) 52-week curves. Saves:
+
+```
+step1a_dsci_MA_2001_2025.png
+```
+
+---
+
+#### Step 1b — Moving Average Smoothing
+
+Applies a centered moving average with window sizes 3, 4, and 5 weeks, then recomputes MBD2 on each smoothed version. Saves:
+
+```
+step1b_dsci_MA_ma3.png
+step1b_dsci_MA_ma4.png
+step1b_dsci_MA_ma5.png
+```
+
+---
+
+#### Step 1c — Spline Smoothing and Derivative
+
+Takes the raw median curve (from Step 1a), fits a `scipy.interpolate.UnivariateSpline`, overlays it on the raw data, and also plots its derivative (rate of change of DSCI over weeks). Saves two plots:
+
+```
+step1c_dsci_MA_spline.png      # raw curves + spline overlay
+step1c_dsci_MA_derivative.png  # dDSCI/dWeek for the median
+```
 
 ---
 
 ## Usage
 
-Place `data.csv` in the same folder as the notebook, then call:
+Set configuration at the top of the notebook:
 
 ```python
-plot_dsci(2001, 2025)              # plot full range
-plot_dsci(2015, 2025)              # last 10 years only
-plot_dsci(2001, 2025, save_png=True)  # also save as .png
+DATA_FILE  = "data.csv"   # path to your data
+STATE      = "MA"         # used in plot titles and filenames
+START_YEAR = 2001
+END_YEAR   = 2025
 ```
 
-### Configuration (top of notebook)
-
-```python
-DATA_FILE = "data.csv"   # path to your data
-STATE     = "MA"         # used in plot title
-```
+Then run all cells in order. Steps 1a → 1b → 1c build on each other.
 
 ---
 
@@ -158,9 +208,10 @@ STATE     = "MA"         # used in plot title
 
 ```
 .
-├── data.csv                  # US Drought Monitor weekly state data
-├── dsci_analysis.ipynb       # Main Jupyter notebook
-├── README.md                 # This file
+├── data.csv                    # US Drought Monitor weekly state data
+├── dsci_central_depth.ipynb    # Main Jupyter notebook
+├── requirements.txt            # Python dependencies
+├── README.md                   # This file
 └── .gitignore
 ```
 
@@ -172,13 +223,14 @@ STATE     = "MA"         # used in plot title
 numpy
 pandas
 matplotlib
+scipy
 jupyter
 ```
 
 Install with:
 
 ```bash
-pip install numpy pandas matplotlib jupyter
+pip install -r requirements.txt
 ```
 
 ---
