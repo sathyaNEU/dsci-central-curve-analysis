@@ -4,6 +4,10 @@
 *.jpeg
 *.svg
 
+# Presentations
+*.pptx
+*.ppt
+*.pdf
 # Jupyter checkpoints
 .ipynb_checkpoints/
 
