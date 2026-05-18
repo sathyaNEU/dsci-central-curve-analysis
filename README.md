@@ -1,6 +1,6 @@
 # DSCI Drought Analysis — Massachusetts
 
-Weekly Drought Severity and Coverage Index (DSCI) visualization with functional median detection using Modified Band Depth (MBD2), moving-average smoothing, and spline-based derivative analysis.
+Weekly Drought Severity and Coverage Index (DSCI) analysis using functional data methods. Detects the median drought year via Modified Band Depth (MBD2), applies moving-average and spline smoothing, repeats the analysis for all 14 MA counties, and extends band depth to 2-D parametric curves pairing DSCI with % area in severe drought (D2+).
 
 ---
 
@@ -189,18 +189,69 @@ step1c_dsci_MA_derivative.png  # dDSCI/dWeek for the median
 
 ---
 
+#### Step 2 — Per-County MBD2 and Spline Medians
+
+Repeats Steps 1a → 1c for each of the **14 Massachusetts counties** using `data_by_county.csv`. Produces:
+
+- A **4×4 grid** of individual county panels (each showing all annual curves + spline median)
+- A **combined overlay** of all 14 county spline medians plus the MA statewide median
+
+```
+step2_county_individual_grid.png
+step2_county_combined_splines.png
+```
+
+---
+
+#### Step 3 — Parametric Curves: DSCI vs. % Area in D2+
+
+Instead of plotting each indicator against time, this step pairs two drought time series into a **parametric curve** in 2-D indicator space:
+
+```
+x(t) = DSCI(t)        (drought severity & coverage index, 0–500)
+y(t) = pAreaD2(t)     (% area in D2 or worse, 0–100)
+t    = 1, 2, …, 52 weeks
+```
+
+Each year traces a closed-loop path through this space, capturing how the *joint* drought signal evolves week by week — no smoothing applied.
+
+**Band depth for 2-D parametric curves** uses a rectangle-band criterion: at each week *t*, curve *i* is inside the band of *(j, k)* if both coordinates land within the axis-aligned rectangle defined by curves *j* and *k*:
+
+```
+min(x_j, x_k) ≤ x_i ≤ max(x_j, x_k)
+min(y_j, y_k) ≤ y_i ≤ max(y_j, y_k)
+```
+
+The same MBD2 scoring (proportion of time inside each pairwise band) is then applied across all 52 weeks and all `n*(n-1)/2` pairs.
+
+Visualization plots all curves in DSCI × pAreaD2 space with the standard depth-based color coding (crimson = median, royalblue = 2nd deepest, forestgreen = 3rd, purple dashed = 3 outliers). A dot marks week 1 on each highlighted curve. Saves:
+
+```
+step3_parametric_MA_2001_2025.png
+```
+
+##### New functions
+
+| Function | Purpose |
+|----------|---------|
+| `build_parametric_matrix(df, start, end)` | Returns two `(n_years × 52)` arrays — DSCI and pAreaD2 — with the same year-filtering logic as `build_matrix` |
+| `modified_band_depth_parametric(mat_x, mat_y)` | 2-D rectangle-band MBD2; O(m·n²) over weeks and curve pairs |
+
+---
+
 ## Usage
 
 Set configuration at the top of the notebook:
 
 ```python
-DATA_FILE  = "data.csv"   # path to your data
-STATE      = "MA"         # used in plot titles and filenames
-START_YEAR = 2001
-END_YEAR   = 2025
+DATA_FILE   = "data.csv"            # statewide DSCI data
+COUNTY_FILE = "data_by_county.csv"  # per-county DSCI data (Step 2)
+STATE       = "MA"                  # used in plot titles and filenames
+START_YEAR  = 2001
+END_YEAR    = 2025
 ```
 
-Then run all cells in order. Steps 1a → 1b → 1c build on each other.
+Then run all cells in order. Steps 1a → 1b → 1c → 2 → 3 build on each other.
 
 ---
 
@@ -209,6 +260,7 @@ Then run all cells in order. Steps 1a → 1b → 1c build on each other.
 ```
 .
 ├── data.csv                    # US Drought Monitor weekly state data
+├── data_by_county.csv          # US Drought Monitor weekly county data
 ├── dsci_central_depth.ipynb    # Main Jupyter notebook
 ├── requirements.txt            # Python dependencies
 ├── README.md                   # This file
