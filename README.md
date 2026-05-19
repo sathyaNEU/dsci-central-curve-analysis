@@ -269,6 +269,54 @@ Then run all cells in order. Steps 1a → 1b → 1c → 2 → 3 build on each ot
 
 ---
 
+## Setup
+
+### 1. Clone the repo
+
+```bash
+git clone <repo-url>
+cd band-depth-analaysis
+```
+
+### 2. Create a virtual environment
+
+```bash
+python3 -m venv .venv
+```
+
+### 3. Activate the environment
+
+```bash
+# macOS / Linux
+source .venv/bin/activate
+
+# Windows (PowerShell)
+.venv\Scripts\Activate.ps1
+```
+
+### 4. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 5. Register the kernel with Jupyter / VS Code
+
+```bash
+python -m ipykernel install --user --name band-depth --display-name "Python (band-depth)"
+```
+
+### 6. Open in VS Code
+
+1. Open the repo folder in VS Code.
+2. Open `dsci_central_depth.ipynb`.
+3. Click **Select Kernel** (top-right of the notebook) → **Python Environments** → choose `.venv` (or the `Python (band-depth)` kernel registered above).
+4. Run all cells in order.
+
+> **Tip:** If VS Code doesn't show the `.venv` kernel automatically, press `Ctrl+Shift+P` → **Python: Select Interpreter** → choose `.venv/bin/python`, then reopen the notebook and select the kernel again.
+
+---
+
 ## Requirements
 
 ```
@@ -277,6 +325,7 @@ pandas
 matplotlib
 scipy
 jupyter
+ipykernel
 ```
 
 Install with:
